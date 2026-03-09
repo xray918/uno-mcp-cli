@@ -1,6 +1,6 @@
 ---
-name: uno-mcp-tools
-description: 通过 bash 命令调用 80+ MCP Server 的全部工具（搜索、GitHub、文档、图表、代码执行、地图、金融等），无需 LLM 原生 tool_use。使用场景：当需要调用外部工具、搜索网络、操作文件、生成图表、执行代码、查询数据时使用此 Skill。
+name: uno
+description: 通过 bash 命令调用 80+ MCP Server 的全部工具，无需 LLM 原生 tool_use。覆盖以下所有类别：搜索与信息检索（DuckDuckGo/Brave/Bing/Exa/Perplexity/Google News/趋势聚合）、开发工具（GitHub/Context7/Figma/Sentry/Neon/Supabase/n8n/HuggingFace）、文档与内容（Markitdown/Fetch/Firecrawl/Word/Excel/PowerPoint/Notion/arXiv）、数据可视化（AntV图表/ECharts/PPT生成）、金融数据（A股/东方财富/雅虎财经/Alpha Vantage/加密货币）、时间与地图（全球时区/百度地图/Google地图）、出行与生活（12306/航班/滴滴/酒店/菜谱/麦当劳/油价/快递）、AI与媒体（图像生成/语音合成/视觉理解/推理）、社交与社区（Reddit/HN/Slack/ClawdChat/抖音）、企业数据（工商/三要素认证/VIN查询/域名）、沙盒脚本执行（Python/Bash/Node）。使用场景：需要搜索网络、操作 GitHub、生成图表、查询地图/天气/股票/航班、执行代码、处理文档、调用任意外部工具时使用此 Skill。
 homepage: https://mcpmarket.cn
 metadata: {"emoji":"🔧","category":"tools","gateway":"https://uno.mcpmarket.cn/mcp"}
 ---
