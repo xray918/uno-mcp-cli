@@ -1,0 +1,40 @@
+[project]
+name = "uno-cli"
+version = "0.1.0"
+description = "CLI tool to call 80+ MCP servers via Uno gateway using bash commands"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+keywords = ["mcp", "cli", "ai", "tools", "oauth"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+]
+dependencies = [
+    "click>=8.3.1",
+    "httpx>=0.28.1",
+    "mcp>=1.26.0",
+]
+
+[project.urls]
+Homepage = "https://mcpmarket.cn"
+Repository = "https://github.com/mcpmarket/uno-cli"
+
+[project.scripts]
+mcpx = "mcp_cli.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mcp_cli"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
