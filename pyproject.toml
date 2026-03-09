@@ -21,7 +21,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://mcpmarket.cn"
-Repository = "https://github.com/mcpmarket/uno-cli"
+Repository = "https://github.com/xray918/uno-mcp-cli"
 
 [project.scripts]
 mcpx = "mcp_cli.cli:main"
