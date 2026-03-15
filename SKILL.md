@@ -1,278 +1,149 @@
 ---
 name: uno
-description: 通过 bash 命令调用 80+ MCP Server 的全部工具，无需 LLM 原生 tool_use。覆盖以下所有类别：搜索与信息检索（DuckDuckGo/Brave/Bing/Exa/Perplexity/Google News/趋势聚合）、开发工具（GitHub/Context7/Figma/Sentry/Neon/Supabase/n8n/HuggingFace）、文档与内容（Markitdown/Fetch/Firecrawl/Word/Excel/PowerPoint/Notion/arXiv）、数据可视化（AntV图表/ECharts/PPT生成）、金融数据（A股/东方财富/雅虎财经/Alpha Vantage/加密货币）、时间与地图（全球时区/百度地图/Google地图）、出行与生活（12306/航班/滴滴/酒店/菜谱/麦当劳/油价/快递）、AI与媒体（图像生成/语音合成/视觉理解/推理）、社交与社区（Reddit/HN/Slack/ClawdChat/抖音）、企业数据（工商/三要素认证/VIN查询/域名）、沙盒脚本执行（Python/Bash/Node）。使用场景：需要搜索网络、操作 GitHub、生成图表、查询地图/天气/股票/航班、执行代码、处理文档、调用任意外部工具时使用此 Skill。
+description: 通过 bash 命令调用 134+ MCP Server 的全部工具，无需 LLM 原生 tool_use。支持 tool 级别语义搜索，一步拿到完整 inputSchema 直接调用。覆盖：搜索（DuckDuckGo/Brave/Exa/Tavily/Jina）、开发（GitHub/Context7/Figma/Sentry/Linear/Deepwiki）、文档（Markitdown/Fetch/Firecrawl/Word/Excel/PPT/Notion/arXiv）、数据可视化（AntV/ECharts）、金融（A股/东方财富/雅虎/Alpha Vantage/世界银行）、地图（百度/Google/高德）、出行（12306/航班/滴滴/酒店/天气/快递）、AI媒体（图像生成/语音合成/视觉理解）、社交（Twitter/Discord/Instagram/LinkedIn/Reddit/HN/ClawdChat）、办公（Gmail/Outlook/Calendar/GoogleDoc/Drive/Trello/Teams/Canva）、企业（工商/招投标/上市公司/风险扫描）、沙盒（Python/Bash/Node）。
 homepage: https://mcpmarket.cn
 metadata: {"emoji":"🔧","category":"tools","gateway":"https://uno.mcpmarket.cn/mcp"}
 ---
 
 # Uno MCP Tools
 
-通过 `mcpx` 命令行工具，调用 Uno 网关聚合的 80+ MCP Server。一条 bash 命令 = 一次工具调用。
+通过 `uno-cli` 命令行工具，调用 Uno 网关聚合的 134+ MCP Server。支持 tool 级别搜索 — 一步拿到完整 inputSchema，下一步直接调用。
 
 ## 安装
 
 ```bash
-pip install uno-cli
+uv tool install uno-cli
 ```
 
-安装后可用命令：`mcpx`
-
-验证：`mcpx --help`
-
-如果 `pip` 不可用，尝试 `pip3` 或先安装 Python 3.12+。
+验证：`uno-cli --help`。如果 `uv` 不可用，可用 `pip3 install uno-cli`。
 
 ## 认证
 
-首次使用需登录。服务器环境（无浏览器）使用 Device Code Flow：
-
 ```bash
-mcpx login --headless
+uno-cli login --headless
 ```
 
-终端会输出设备码和链接，在任意浏览器中打开链接、输入设备码、选择 GitHub/Google/微信登录即可。终端自动完成。
+**必须原样复制终端输出的链接和设备码展示给用户，禁止自行拼接或修改 URL。** Token 存储在 `~/.uno/tokens.json`，有效期 30 天。检查状态：`uno-cli status`
 
-Token 存储在 `~/.uno/tokens.json`，登录一次长期有效（30 天）。
+## 5 个网关工具
 
-检查状态：`mcpx status`
+| 工具 | 职责 |
+|------|------|
+| `uno_search_servers` | **搜索**（主入口）— 返回最相关的 tools + 完整 inputSchema |
+| `uno_discover_servers` | **连接** — 按 server_names 获取 tools 定义 / 触发 OAuth 认证 |
+| `uno_call_tool` | **执行** — 调用具体工具（server.tool_name 格式） |
+| `uno_execute_script` | **沙盒** — 执行 Python/Bash/Node 脚本 |
+| `uno_rate_server` | **评分** — 使用后反馈，影响搜索排名 |
 
-## 核心命令
-
-```bash
-# 列出网关工具（3 个入口工具）
-mcpx --json tools list
-
-# 发现目标 server 的工具
-mcpx tools call uno_discover_servers '{"server_names": ["time"]}'
-
-# 调用具体工具（格式：server.tool_name）
-mcpx tools call uno_call_tool '{"tool_name": "time.get_current_time", "arguments": {"timezone": "Asia/Shanghai"}}'
-
-# 沙盒执行脚本
-mcpx tools call uno_execute_script '{"language": "python", "script": "print(2**10)"}'
-```
-
-所有输出为 JSON，可配合 `jq` 提取：
+## 两步调用（核心流程）
 
 ```bash
-mcpx --json tools call uno_call_tool '{"tool_name": "time.get_current_time", "arguments": {"timezone": "UTC"}}' | jq '.content[0].text | fromjson'
+# 第一步：搜索 → 直接拿到 tools + inputSchema
+uno-cli tools call uno_search_servers '{"query": "天气预报", "mode": "hybrid"}'
+
+# 第二步：调用（从搜索结果的 tool 字段取 server.tool_name）
+uno-cli tools call uno_call_tool '{"tool_name": "amap-maps.maps_weather", "arguments": {"city": "北京"}}'
 ```
 
-## 两步调用模式
+## uno_search_servers 参数
 
-Uno 是网关，调用任何工具都是两步：
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `query` | string | **必填** 搜索关键词（中英文/自然语言均可） |
+| `category` | string | 按分类浏览，如 `搜索`、`开发`、`金融`、`社交` |
+| `mode` | string | `keyword`（精确,快）/ `semantic`（语义）/ `hybrid`（混合,推荐） |
+| `limit` | int | 返回 tool 数量，默认 5，最大 15 |
 
-**第一步 — discover**：获取目标 server 的工具列表和参数 schema
+返回：
+- `tools`: 最相关的 tool 列表，每个含 `tool`（server.tool_name）、`desc`、`inputSchema`
+- `uncached`: 需要先认证的 OAuth server（如有），提示调用 `uno_discover_servers` 触发认证
+
+## uno_discover_servers 参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `server_names` | array | 要获取完整 tools 定义的 server 名称列表 |
+| `category` | string | 按分类浏览 server |
+
+使用场景：
+- `uno_search_servers` 返回的 `uncached` server 需要 OAuth 认证时
+- 已知 server 名称需要完整 tools 定义时
+
+## OAuth 认证流程（冷启动，极少发生）
 
 ```bash
-mcpx tools call uno_discover_servers '{"server_names": ["github"]}'
+# 1. search 发现 uncached OAuth server
+uno-cli tools call uno_search_servers '{"query": "GitHub PR"}'
+# → uncached: [{server: "github", auth_required: true, action: "uno_discover_servers(...)"}]
+
+# 2. discover 触发认证
+uno-cli tools call uno_discover_servers '{"server_names": ["github"]}'
+# → auth_url: "https://mcpmarket.cn/oauth/..."（展示给用户点击）
+
+# 3. 用户授权后再次 discover
+uno-cli tools call uno_discover_servers '{"server_names": ["github"]}'
+# → 返回完整 tools（同时自动缓存到 DB，之后 search 可直接找到）
+
+# 4. 调用
+uno-cli tools call uno_call_tool '{"tool_name": "github.search_repositories", "arguments": {...}}'
 ```
 
-**第二步 — call_tool**：用 `server.tool_name` 格式调用
+## 可用分类
 
-```bash
-mcpx tools call uno_call_tool '{"tool_name": "github.search_repositories", "arguments": {"query": "mcp server language:python"}}'
-```
-
-## 可用 Server 目录
-
-以下是 Uno 网关当前聚合的全部 MCP Server。`server_names` 参数必须从此列表选择。
-
-### 搜索与信息检索
-
-| server | 说明 |
-|--------|------|
-| duckduckgo | 网页搜索 + URL 内容提取 |
-| brave-search | Brave 搜索，支持 Web 和本地搜索 |
-| exa-search | 神经搜索，适合代码和技术文档 |
-| bing-search | 必应搜索，中文优化，无需 API Key |
-| bocha-search-mcp | 博查搜索，覆盖数十亿网页 |
-| metaso-search | 秘塔搜索，RAG 智能问答 + 网页提取 |
-| perplexity-ask | Perplexity AI 搜索 |
-| brightdata-search | 穿透反爬的实时网页数据采集 |
-| Bright Data Search | 绕过反爬获取最新网页数据 |
-| google-news | Google News 分类新闻搜索 |
-| trends | 趋势聚合，20+ 热搜源 |
-
-### 开发工具
-
-| server | 说明 |
-|--------|------|
-| github | GitHub 仓库、Issue、PR 操作 |
-| context7 | 实时代码库文档查询，防止 AI 幻觉 |
-| ref-tools-mcp | 最新技术文档访问 |
-| zread | GitHub 开源项目文档和代码分析 |
-| figma-context | Figma 设计稿转代码 |
-| sentry-mcp | Sentry 错误调试 |
-| mcp-server-neon | Neon Postgres 数据库自然语言交互 |
-| supabase-mcp | Supabase 项目 AI 管理 |
-| n8n | n8n 工作流自动化 |
-| hf-mcp-server | Hugging Face 模型服务 |
-| MCP服务器开发工具包 | FastMCP 开发指南和模板 |
-
-### 文档与内容
-
-| server | 说明 |
-|--------|------|
-| markitdown | 任意 URI 转 Markdown |
-| fetch | 网页转 Markdown，支持分页 |
-| firecrawl | 网站爬取转结构化数据 |
-| word | 创建和编辑 Word 文档 |
-| excel | 创建/读取 Excel，含公式和图表 |
-| powerpoint | PowerPoint 操作，32 个工具 |
-| arxiv | arXiv 论文搜索和下载 |
-| Arxiv-Paper-MCP | arXiv 论文搜索、解读、最新 AI 论文 |
-| notion | Notion 页面和数据库管理 |
-| pageindex-mcp | 基于推理的层级 RAG 系统 |
-
-### 数据可视化
-
-| server | 说明 |
-|--------|------|
-| chart | AntV 25+ 专业图表生成 |
-| 图表生成工具 | ECharts 动态图表（折线/柱状/饼图/雷达/散点） |
-| gezhe-ppt-mcp | 从主题生成 PPT |
-
-### 金融与数据
-
-| server | 说明 |
-|--------|------|
-| akshare-stock-china | A 股实时行情、K 线、财报 |
-| eastmoney-stock-china | 东方财富 A 股数据和技术指标 |
-| yahoo-finance | 雅虎财经全球股票行情 |
-| Alpha Vantage | 全球金融数据（股票/加密/外汇/商品） |
-| Qieman | 基金数据和投资分析 |
-| dexpaprika | 加密货币和 DEX 实时数据 |
-| 基金知识查询服务器 | 基金知识检索和股票搜索 |
-| 货币与石油价格服务器 | 实时汇率和布伦特原油价格 |
-| world-bank | 世界银行全球经济社会数据 |
-
-### 时间与地图
-
-| server | 说明 |
-|--------|------|
-| time | 全球时区查询和时间转换 |
-| baidu-map | 百度地图 LBS 地理空间 API |
-| google-map | Google 地图服务 |
-
-### 出行与生活
-
-| server | 说明 |
-|--------|------|
-| 12306 | 中国铁路车票查询 |
-| variflight | 航班信息、天气、舒适度指标 |
-| didi | 滴滴打车查价、预估时间、叫车 |
-| Hotel MCP | 国内酒店查询（覆盖 80% 五星级） |
-| aigohotel | 全球酒店搜索和推荐 |
-| HowToCook-mcp | 菜谱和膳食规划 |
-| McDonald's | 麦当劳活动日历和优惠券 |
-| 美味不用等 | 排队取号服务 |
-| today-oil-price-china | 全国 31 省油价实时查询 |
-| express-tracking-china | 全球快递追踪（1000+ 物流商） |
-
-### AI 与媒体
-
-| server | 说明 |
-|--------|------|
-| minimax | MiniMax AI 决策优化 |
-| elevenlabs | ElevenLabs 语音合成 |
-| nano-banana | Gemini 图片生成 + ImgBB 托管 |
-| modelscope-image | ModelScope AI 图像生成和变换 |
-| zhipu-vision | 智谱视觉理解（图像分析/OCR/视频） |
-| sequentialthinking | 结构化逐步推理 |
-| edgeone-pages-mcp | HTML 部署到 EdgeOne Pages |
-
-### 社交与社区
-
-| server | 说明 |
-|--------|------|
-| reddit | Reddit 帖子、评论、趋势浏览 |
-| mcp-hn | Hacker News 故事和用户 |
-| slack | Slack 消息和频道管理 |
-| clawdchat-mcp | ClawdChat AI 社交网络 |
-| 🦐虾聊AI社交网络 | 虾聊 AI 社交（AI-to-AI） |
-| douyin | 抖音无水印视频下载和音频提取 |
-
-### 企业与数据服务
-
-| server | 说明 |
-|--------|------|
-| enterprise-big-data-china | 中国企业工商、法务、财报、知产 |
-| china-carrier-tri-factor-auth | 运营商三要素实名认证 |
-| car-vin-lookup-china | VIN 车辆识别码查询 |
-| 域名查询服务 | RDAP/WHOIS/DNS 域名信息 |
-| 智能搜索工具集 | 14 个增强搜索覆盖主流技术平台 |
-| apify-mcp-server | Apify 网页抓取任务管理 |
-| mcp | Hyperbrowser 数据爬取 |
-| BrightData | 浏览器自动化和页面操作 |
-| GoogleDrive | Google Drive 文件管理 |
-| Icons8 MCP server | SVG/PNG 图标获取 |
-| Logo提取处理工具 | 网站 Logo 提取和分析 |
-| Webhook MCP | 自定义 Webhook 请求 |
-| 测试沙盒Sandbox MCP | 企业可恢复沙盒环境 |
-
-### 其他特色服务
-
-| server | 说明 |
-|--------|------|
-| bazi | 八字命理分析 |
-| 星座 MCP 服务 | 星座查询、运势、配对 |
-| MBTI测试服务 | MBTI 性格测试 |
-| AI人格服务器 | 多 AI 角色协作 |
-| biomcp | 生物医学 AI 工具包 |
-| baichuan-mcp-servers | 百川智能医疗信息 |
-| Theta Health MCP | HIPAA 健康数据（300+ 设备） |
-| 苹果开发者文档搜索服务 | Apple 开发文档搜索 |
-| taoke-mcp | 淘客推广链接转换（淘宝/京东/拼多多） |
-| agentsyun-coupons-china | 外卖/娱乐/出行优惠券 |
-| GoWeb3 Data | Web3 事件和新闻 |
-| OSRS玩家数据服务 | 老学校 RuneScape 玩家数据 |
-| 柏林公共服务查询服务 | 柏林 1000+ 行政服务查询 |
-| 英国国家统计局MCP服务器 | 英国官方统计数据 |
+| 分类 | 数量 | 代表 server |
+|------|------|-------------|
+| 搜索 | 66 | exa-search, Jina, Tavily, brave-search |
+| 数据 | 67 | world-bank, Jina, pageindex-mcp |
+| 开发 | 45 | github, context7, Deepwiki, Linear |
+| 社交 | 31 | clawdchat-mcp, twitter, Discord, Instagram |
+| 创作 | 30 | powerpoint, zhipu-vision, nano-banana |
+| 企业 | 28 | enterprise-search, enterprise-risk-scanner |
+| 生产 | 14 | Gmail, Google Calendar, Trello, Canva |
+| 金融 | 14 | eastmoney-stock-china, Alpha Vantage, yahoo-finance |
+| 电商 | 8 | Ecommerce, McDonald's, express-tracking-china |
 
 ## 常见用法示例
 
-### 搜索网页
+### 搜索并调用（最常用）
 
 ```bash
-mcpx tools call uno_discover_servers '{"server_names": ["duckduckgo"]}'
-mcpx tools call uno_call_tool '{"tool_name": "duckduckgo.search", "arguments": {"query": "MCP protocol 2025"}}'
+# 搜索
+uno-cli tools call uno_search_servers '{"query": "查北京天气", "mode": "hybrid"}'
+# 调用（用返回的 tool 字段）
+uno-cli tools call uno_call_tool '{"tool_name": "amap-maps.maps_weather", "arguments": {"city": "北京"}}'
 ```
 
-### 操作 GitHub
+### 按分类浏览
 
 ```bash
-mcpx tools call uno_discover_servers '{"server_names": ["github"]}'
-mcpx tools call uno_call_tool '{"tool_name": "github.search_repositories", "arguments": {"query": "mcp server stars:>100"}}'
+uno-cli tools call uno_search_servers '{"category": "金融", "limit": 10}'
 ```
 
-### 生成图表
+### 执行脚本
 
 ```bash
-mcpx tools call uno_discover_servers '{"server_names": ["chart"]}'
-mcpx tools call uno_call_tool '{"tool_name": "chart.bindbindbindbindbindbindbar_bindchart", "arguments": {...}}'
+uno-cli tools call uno_execute_script '{"language": "python", "script": "print(42 * 2)"}'
 ```
 
-注意：先用 discover 获取工具的 inputSchema，再按 schema 传参。
-
-### 执行 Python 脚本
+### 使用后评分
 
 ```bash
-mcpx tools call uno_execute_script '{"language": "python", "script": "import json; print(json.dumps({\"result\": 42}))"}'
+uno-cli tools call uno_rate_server '{"server_name": "amap-maps", "rating": 4.5, "comment": "响应快"}'
 ```
 
-### 查询 A 股
+### JSON 输出配合 jq
 
 ```bash
-mcpx tools call uno_discover_servers '{"server_names": ["akshare-stock-china"]}'
-# 查看返回的工具列表，选择合适的工具调用
+uno-cli --json tools call uno_call_tool '{"tool_name": "time.get_current_time", "arguments": {"timezone": "UTC"}}' | jq '.content[0].text | fromjson'
 ```
 
 ## 工作流建议
 
-1. **不确定用哪个 server？** 对照上方目录，按功能类别找到目标 server
-2. **不确定工具参数？** 先 `discover` 获取 inputSchema，再按 schema 填参数
-3. **调用失败？** 检查 `mcpx status` 确认 token 有效；检查 server_names 拼写
-4. **需要 OAuth 的 server？** discover 会返回 `auth_url`，用户需先授权
+1. **首选 `uno_search_servers`** — 直接拿到 tools + schema，两步完成调用
+2. **自然语言用 `hybrid` 模式** — 语义搜索更准确
+3. **OAuth server** — search 会标记 uncached，按提示调用 discover 认证即可
+4. **评分** — 调用后请用 `uno_rate_server` 反馈，帮助优化搜索排名
+5. **参数不确定** — search 返回的 inputSchema 就是完整参数定义
 
 ## 凭证管理
 
@@ -280,7 +151,5 @@ mcpx tools call uno_discover_servers '{"server_names": ["akshare-stock-china"]}'
 |------|------|
 | Token 文件 | `~/.uno/tokens.json` |
 | MCP 网关 | `https://uno.mcpmarket.cn/mcp` |
-| 登录命令 | `mcpx login --headless` |
-| 登出命令 | `mcpx logout` |
-
-Token 有效期 30 天，过期后重新执行 `mcpx login --headless`。
+| 登录命令 | `uno-cli login --headless` |
+| 登出命令 | `uno-cli logout` |

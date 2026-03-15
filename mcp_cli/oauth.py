@@ -59,7 +59,7 @@ async def discover_oauth_metadata(mcp_url: str) -> dict:
 async def register_client(registration_endpoint: str) -> dict:
     """Dynamic client registration (RFC 7591)."""
     payload = {
-        "client_name": "mcp-bash-cli",
+        "client_name": "Uno",
         "redirect_uris": [REDIRECT_URI],
         "grant_types": ["authorization_code"],
         "response_types": ["code"],
@@ -136,8 +136,8 @@ async def login(mcp_url: str) -> dict:
     server_thread.start()
 
     # Open browser
-    print(f"Opening browser for authorization...")
-    print(f"If browser doesn't open, visit:\n{auth_url}")
+    print(f"Opening browser for authorization...", flush=True)
+    print(f"If browser doesn't open, visit:\n{auth_url}", flush=True)
     webbrowser.open(auth_url)
 
     # Wait for callback
@@ -158,7 +158,7 @@ async def login(mcp_url: str) -> dict:
         "client_id": client_id,
         "code_verifier": code_verifier,
     }
-    print(f"Exchanging authorization code for token...")
+    print(f"Exchanging authorization code for token...", flush=True)
     tokens = None
     last_error = None
     async with httpx.AsyncClient(follow_redirects=True, timeout=30, headers=HTTP_HEADERS) as http:
@@ -167,7 +167,7 @@ async def login(mcp_url: str) -> dict:
                 resp = await http.post(meta["token_endpoint"], data=token_data)
                 if resp.status_code >= 500:
                     last_error = f"Server error {resp.status_code}: {resp.text}"
-                    print(f"  Attempt {attempt + 1}/3 failed ({resp.status_code}), retrying...")
+                    print(f"  Attempt {attempt + 1}/3 failed ({resp.status_code}), retrying...", flush=True)
                     await asyncio.sleep(2 ** attempt)
                     continue
                 resp.raise_for_status()
@@ -177,7 +177,7 @@ async def login(mcp_url: str) -> dict:
                 raise RuntimeError(f"Token exchange failed: {e}")
             except httpx.RequestError as e:
                 last_error = str(e)
-                print(f"  Attempt {attempt + 1}/3 network error, retrying...")
+                print(f"  Attempt {attempt + 1}/3 network error, retrying...", flush=True)
                 await asyncio.sleep(2 ** attempt)
 
     if tokens is None:
@@ -229,14 +229,14 @@ async def login_device(mcp_url: str) -> dict:
     expires_in = device_data.get("expires_in", 600)
     interval = device_data.get("interval", 5)
 
-    print(f"\n{'=' * 56}")
-    print(f"  请在浏览器中打开以下链接并输入设备码:")
-    print(f"  链接: {verification_uri}")
-    print(f"  设备码: {user_code}")
+    print(f"\n{'=' * 56}", flush=True)
+    print(f"  请在浏览器中打开以下链接并输入设备码:", flush=True)
+    print(f"  链接: {verification_uri}", flush=True)
+    print(f"  设备码: {user_code}", flush=True)
     if verification_uri_complete:
-        print(f"\n  或直接打开: {verification_uri_complete}")
-    print(f"\n  等待授权中... (有效期 {expires_in // 60} 分钟)")
-    print(f"{'=' * 56}\n")
+        print(f"\n  或直接打开: {verification_uri_complete}", flush=True)
+    print(f"\n  等待授权中... (有效期 {expires_in // 60} 分钟)", flush=True)
+    print(f"{'=' * 56}\n", flush=True)
 
     token_endpoint = meta["token_endpoint"]
     grant_type = "urn:ietf:params:oauth:grant-type:device_code"
@@ -276,7 +276,7 @@ async def login_device(mcp_url: str) -> dict:
                     raise RuntimeError(f"Token 请求失败: {error_data}")
 
             except httpx.RequestError:
-                print("  网络错误，重试中...")
+                print("  网络错误，重试中...", flush=True)
                 await asyncio.sleep(interval)
 
     if tokens is None:

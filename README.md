@@ -5,7 +5,7 @@
 ## 安装
 
 ```bash
-pip install uno-cli
+uv tool install uno-cli
 ```
 
 ## 认证
@@ -13,7 +13,7 @@ pip install uno-cli
 服务器环境（无浏览器）使用 Device Code Flow：
 
 ```bash
-mcpx login --headless
+uno-cli login --headless
 ```
 
 终端会输出设备码和验证链接，在任意浏览器中打开链接、输入设备码完成授权。Token 存储在 `~/.uno/tokens.json`。
@@ -22,16 +22,16 @@ mcpx login --headless
 
 ```bash
 # 检查状态
-mcpx status
+uno-cli status
 
 # 发现 server 工具
-mcpx tools call uno_discover_servers '{"server_names": ["time"]}'
+uno-cli tools call uno_discover_servers '{"server_names": ["time"]}'
 
 # 调用工具
-mcpx tools call uno_call_tool '{"tool_name": "time.get_current_time", "arguments": {"timezone": "Asia/Shanghai"}}'
+uno-cli tools call uno_call_tool '{"tool_name": "time.get_current_time", "arguments": {"timezone": "Asia/Shanghai"}}'
 
 # 沙盒执行脚本
-mcpx tools call uno_execute_script '{"language": "python", "script": "print(2**10)"}'
+uno-cli tools call uno_execute_script '{"language": "python", "script": "print(2**10)"}'
 ```
 
 ## 支持的 MCP Server
