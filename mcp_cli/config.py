@@ -9,6 +9,7 @@ TOKEN_FILE = CONFIG_DIR / "tokens.json"
 
 def ensure_config_dir() -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    CONFIG_DIR.chmod(0o700)
 
 
 def save_tokens(server_url: str, tokens: dict) -> None:
@@ -16,6 +17,7 @@ def save_tokens(server_url: str, tokens: dict) -> None:
     all_tokens = load_all_tokens()
     all_tokens[server_url] = tokens
     TOKEN_FILE.write_text(json.dumps(all_tokens, indent=2, ensure_ascii=False))
+    TOKEN_FILE.chmod(0o600)
 
 
 def load_tokens(server_url: str) -> dict | None:

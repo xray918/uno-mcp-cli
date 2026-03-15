@@ -1,155 +1,145 @@
 ---
 name: uno
-description: 通过 bash 命令调用 134+ MCP Server 的全部工具，无需 LLM 原生 tool_use。支持 tool 级别语义搜索，一步拿到完整 inputSchema 直接调用。覆盖：搜索（DuckDuckGo/Brave/Exa/Tavily/Jina）、开发（GitHub/Context7/Figma/Sentry/Linear/Deepwiki）、文档（Markitdown/Fetch/Firecrawl/Word/Excel/PPT/Notion/arXiv）、数据可视化（AntV/ECharts）、金融（A股/东方财富/雅虎/Alpha Vantage/世界银行）、地图（百度/Google/高德）、出行（12306/航班/滴滴/酒店/天气/快递）、AI媒体（图像生成/语音合成/视觉理解）、社交（Twitter/Discord/Instagram/LinkedIn/Reddit/HN/ClawdChat）、办公（Gmail/Outlook/Calendar/GoogleDoc/Drive/Trello/Teams/Canva）、企业（工商/招投标/上市公司/风险扫描）、沙盒（Python/Bash/Node）。
+description: 通过 curl 调用 134+ MCP Server 的全部工具，零安装。支持 tool 级别语义搜索，一步拿到完整 inputSchema 直接调用。覆盖：搜索、开发、文档、金融、地图、出行、AI媒体、社交、办公、企业等领域。
 homepage: https://mcpmarket.cn
-metadata: {"emoji":"🔧","category":"tools","gateway":"https://uno.mcpmarket.cn/mcp"}
+source: https://github.com/xray918/uno-mcp-cli
+license: MIT
+metadata: {"emoji":"🔧","category":"tools"}
 ---
 
 # Uno MCP Tools
 
-通过 `uno-cli` 命令行工具，调用 Uno 网关聚合的 134+ MCP Server。支持 tool 级别搜索 — 一步拿到完整 inputSchema，下一步直接调用。
+通过 `curl` 直接调用 MCPMarket 平台的 REST API，搜索并调用 134+ MCP Server 的工具。无需安装任何包。
 
-## 安装
+## 前置条件
 
-```bash
-uv tool install uno-cli
-```
-
-验证：`uno-cli --help`。如果 `uv` 不可用，可用 `pip3 install uno-cli`。
+- `curl`（系统自带）
 
 ## 认证
 
 ```bash
-uno-cli login --headless
+# 1. 请求设备码
+curl -s -X POST https://mcpmarket.cn/oauth/device/code \
+  -d "client_id=skill-agent&scope=mcp:*"
 ```
 
-**必须原样复制终端输出的链接和设备码展示给用户，禁止自行拼接或修改 URL。** Token 存储在 `~/.uno/tokens.json`，有效期 30 天。检查状态：`uno-cli status`
+**必须原样复制终端输出的 `verification_uri` 和 `user_code` 展示给用户，禁止自行拼接或修改 URL。**
 
-## 5 个网关工具
+```bash
+# 2. 用户授权后轮询获取 token（每 5 秒重试，直到返回 access_token）
+curl -s -X POST https://mcpmarket.cn/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code=DEVICE_CODE&client_id=skill-agent"
 
-| 工具 | 职责 |
-|------|------|
-| `uno_search_servers` | **搜索**（主入口）— 返回最相关的 tools + 完整 inputSchema |
-| `uno_discover_servers` | **连接** — 按 server_names 获取 tools 定义 / 触发 OAuth 认证 |
-| `uno_call_tool` | **执行** — 调用具体工具（server.tool_name 格式） |
-| `uno_execute_script` | **沙盒** — 执行 Python/Bash/Node 脚本 |
-| `uno_rate_server` | **评分** — 使用后反馈，影响搜索排名 |
+# 3. 存储 token
+mkdir -p ~/.uno && chmod 700 ~/.uno
+echo "ACCESS_TOKEN_VALUE" > ~/.uno/token && chmod 600 ~/.uno/token
+```
+
+验证登录：
+```bash
+curl -s https://mcpmarket.cn/api/uno/verify-token \
+  -H "Authorization: Bearer $(cat ~/.uno/token)"
+```
 
 ## 两步调用（核心流程）
 
 ```bash
-# 第一步：搜索 → 直接拿到 tools + inputSchema
-uno-cli tools call uno_search_servers '{"query": "天气预报", "mode": "hybrid"}'
+# 第一步：搜索 tools，拿到 tool_name 和 inputSchema
+curl -s "https://mcpmarket.cn/api/uno/search-tools?q=weather&mode=hybrid&limit=5" \
+  -H "Authorization: Bearer $(cat ~/.uno/token)"
 
-# 第二步：调用（从搜索结果的 tool 字段取 server.tool_name）
-uno-cli tools call uno_call_tool '{"tool_name": "amap-maps.maps_weather", "arguments": {"city": "北京"}}'
+# 第二步：调用工具
+curl -s -X POST https://mcpmarket.cn/api/uno/call-tool \
+  -H "Authorization: Bearer $(cat ~/.uno/token)" \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name":"tonghu-weather.weatherArea","arguments":{"area":"北京"}}'
 ```
 
-## uno_search_servers 参数
+## API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/uno/search-tools` | GET | 搜索 tools（主入口）— 返回 tools + 完整 inputSchema |
+| `/api/uno/search-servers` | GET | 搜索 servers |
+| `/api/uno/call-tool` | POST | 调用工具（server.tool_name 格式） |
+| `/api/uno/categories` | GET | 获取所有分类及数量 |
+| `/api/uno/rate-server` | POST | 使用后评分，影响搜索排名 |
+
+所有端点 Base URL 为 `https://mcpmarket.cn`，需要 `Authorization: Bearer <token>` 头。
+
+## search-tools 参数
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `query` | string | **必填** 搜索关键词（中英文/自然语言均可） |
+| `q` | string | 搜索关键词 |
 | `category` | string | 按分类浏览，如 `搜索`、`开发`、`金融`、`社交` |
-| `mode` | string | `keyword`（精确,快）/ `semantic`（语义）/ `hybrid`（混合,推荐） |
-| `limit` | int | 返回 tool 数量，默认 5，最大 15 |
+| `mode` | string | `keyword`（精确）/ `semantic`（语义）/ `hybrid`（混合，推荐） |
+| `limit` | int | 返回数量，默认 5，最大 15 |
 
-返回：
-- `tools`: 最相关的 tool 列表，每个含 `tool`（server.tool_name）、`desc`、`inputSchema`
-- `uncached`: 需要先认证的 OAuth server（如有），提示调用 `uno_discover_servers` 触发认证
+返回：`tools[]`（含 `tool`、`desc`、`inputSchema`）、`uncached`（需先连接的 server）
 
-## uno_discover_servers 参数
+**搜索关键词技巧：** 后台向量数据库以 tool 的功能描述作为索引源，搜索词应匹配**工具功能**而非具体查询意图。
+- ✅ `weather` / `天气` — 能命中天气类工具描述
+- ❌ `上海天气` — 像查询意图，反而不易命中工具
+
+## call-tool 参数
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `server_names` | array | 要获取完整 tools 定义的 server 名称列表 |
-| `category` | string | 按分类浏览 server |
+| `tool_name` | string | **必填** 格式 `server_name.tool_name`（从 search-tools 的 `tool` 字段获取） |
+| `arguments` | object | **必填** 按 inputSchema 构造 |
 
-使用场景：
-- `uno_search_servers` 返回的 `uncached` server 需要 OAuth 认证时
-- 已知 server 名称需要完整 tools 定义时
-
-## OAuth 认证流程（冷启动，极少发生）
-
-```bash
-# 1. search 发现 uncached OAuth server
-uno-cli tools call uno_search_servers '{"query": "GitHub PR"}'
-# → uncached: [{server: "github", auth_required: true, action: "uno_discover_servers(...)"}]
-
-# 2. discover 触发认证
-uno-cli tools call uno_discover_servers '{"server_names": ["github"]}'
-# → auth_url: "https://mcpmarket.cn/oauth/..."（展示给用户点击）
-
-# 3. 用户授权后再次 discover
-uno-cli tools call uno_discover_servers '{"server_names": ["github"]}'
-# → 返回完整 tools（同时自动缓存到 DB，之后 search 可直接找到）
-
-# 4. 调用
-uno-cli tools call uno_call_tool '{"tool_name": "github.search_repositories", "arguments": {...}}'
+**响应结构：**
+```json
+{"content": [{"type": "text", "text": "<JSON字符串>"}], "isError": false}
 ```
+> `content[0].text` 本身是 JSON 字符串，需要二次解析。错误时 `isError` 为 `true`，`error` 字段包含错误信息。
 
-## 可用分类
-
-| 分类 | 数量 | 代表 server |
-|------|------|-------------|
-| 搜索 | 66 | exa-search, Jina, Tavily, brave-search |
-| 数据 | 67 | world-bank, Jina, pageindex-mcp |
-| 开发 | 45 | github, context7, Deepwiki, Linear |
-| 社交 | 31 | clawdchat-mcp, twitter, Discord, Instagram |
-| 创作 | 30 | powerpoint, zhipu-vision, nano-banana |
-| 企业 | 28 | enterprise-search, enterprise-risk-scanner |
-| 生产 | 14 | Gmail, Google Calendar, Trello, Canva |
-| 金融 | 14 | eastmoney-stock-china, Alpha Vantage, yahoo-finance |
-| 电商 | 8 | Ecommerce, McDonald's, express-tracking-china |
-
-## 常见用法示例
-
-### 搜索并调用（最常用）
-
-```bash
-# 搜索
-uno-cli tools call uno_search_servers '{"query": "查北京天气", "mode": "hybrid"}'
-# 调用（用返回的 tool 字段）
-uno-cli tools call uno_call_tool '{"tool_name": "amap-maps.maps_weather", "arguments": {"city": "北京"}}'
+**下游服务 OAuth 授权：** 首次调用某些服务（如 GitHub、Notion）时会返回：
+```json
+{"auth_required": true, "auth_url": "https://...", "state_id": "..."}
 ```
+打开 `auth_url` 完成授权后，**直接重新调用**即可，平台服务端自动关联，无需额外操作。
 
-### 按分类浏览
+## ⚠️ 参数构造铁律（必读，避免反复试错）
 
-```bash
-uno-cli tools call uno_search_servers '{"category": "金融", "limit": 10}'
-```
+**调用前必须先读 inputSchema，不猜参数。** 具体检查项：
 
-### 执行脚本
+| 检查项 | 说明 | 反例教训 |
+|--------|------|----------|
+| `required` 字段 | 必传，一个都不能少 | 漏传导致报错 |
+| `minLength: 1` | 不能传空字符串 `""` | Notion search 空 query 返回空结果 |
+| 字段名从 schema 原文复制 | 不凭印象写 | `filter` vs `filters` 一字之差直接报错 |
+| `enum` 约束 | 只能传枚举值内的字符串 | 传错值工具静默失败 |
+| `description` | 字段含义不明时必看 | 避免传入格式错误的值 |
 
-```bash
-uno-cli tools call uno_execute_script '{"language": "python", "script": "print(42 * 2)"}'
-```
-
-### 使用后评分
-
-```bash
-uno-cli tools call uno_rate_server '{"server_name": "amap-maps", "rating": 4.5, "comment": "响应快"}'
-```
-
-### JSON 输出配合 jq
+**标准两步流程（不可跳过第一步）：**
 
 ```bash
-uno-cli --json tools call uno_call_tool '{"tool_name": "time.get_current_time", "arguments": {"timezone": "UTC"}}' | jq '.content[0].text | fromjson'
+# 第一步：search-tools，读 inputSchema（每次必做）
+curl -s "https://mcpmarket.cn/api/uno/search-tools?q=<功能关键词>&mode=hybrid&limit=5" \
+  -H "Authorization: Bearer $(cat ~/.uno/token)"
+# → 仔细检查 required / minLength / 字段名 / enum
+
+# 第二步：按 schema 一次构造正确参数调用
+curl -s -X POST https://mcpmarket.cn/api/uno/call-tool \
+  -H "Authorization: Bearer $(cat ~/.uno/token)" \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name":"<tool>","arguments":{<按schema填写>}}'
 ```
 
 ## 工作流建议
 
-1. **首选 `uno_search_servers`** — 直接拿到 tools + schema，两步完成调用
-2. **自然语言用 `hybrid` 模式** — 语义搜索更准确
-3. **OAuth server** — search 会标记 uncached，按提示调用 discover 认证即可
-4. **评分** — 调用后请用 `uno_rate_server` 反馈，帮助优化搜索排名
-5. **参数不确定** — search 返回的 inputSchema 就是完整参数定义
+1. **先 search-tools，读完 inputSchema 再调用** — 这是最重要的一步，不可省略
+2. **搜索词匹配工具功能，不是查询意图** — `weather` ✅，`上海明天天气` ❌
+3. **参数名从 schema 原文复制** — 不凭印象，`filters` 不是 `filter`
+4. **无结果时** — 换英文关键词，或换 `mode=semantic` 重试
 
 ## 凭证管理
 
-| 项目 | 路径 |
+| 项目 | 值 |
 |------|------|
-| Token 文件 | `~/.uno/tokens.json` |
-| MCP 网关 | `https://uno.mcpmarket.cn/mcp` |
-| 登录命令 | `uno-cli login --headless` |
-| 登出命令 | `uno-cli logout` |
+| Token 文件 | `~/.uno/token`（权限 0600） |
+| API Base URL | `https://mcpmarket.cn` |
+| 登出 | `rm ~/.uno/token` |
