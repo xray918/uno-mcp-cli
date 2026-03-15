@@ -1,15 +1,14 @@
 ---
 name: uno
-description: 通过 curl 调用 1300+ tools（来自 134+ MCP Server），零安装。支持 tool 级别语义搜索，一步拿到完整 inputSchema 直接调用。覆盖：搜索、开发、文档、金融、地图、出行、AI媒体、社交、办公、企业等领域。
+description: 通过 curl 调用 1500+ tools（来自 134+ MCP Server），零安装。支持 tool 级别语义搜索，一步拿到完整 inputSchema 直接调用。覆盖：搜索、开发、文档、金融、地图、出行、AI媒体、社交、办公、企业等领域。
 homepage: https://mcpmarket.cn
-source: https://github.com/xray918/uno-mcp-cli
 license: MIT
 metadata: {"emoji":"🔧","category":"tools"}
 ---
 
 # Uno MCP Tools
 
-通过 `curl` 直接调用 MCPMarket 平台的 REST API，搜索并调用 1300+ tools（来自 134+ MCP Server）。无需安装任何包。
+通过 `curl` 直接调用 MCPMarket 平台的 REST API，搜索并调用 1500+ tools（来自 134+ MCP Server）。无需安装任何包。
 
 ## 前置条件
 
